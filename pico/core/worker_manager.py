@@ -114,6 +114,7 @@ class WorkerManager:
             worker_id = f"agent_{int(self.state.get('next_id', 1))}"
             self.state["next_id"] = int(self.state.get("next_id", 1)) + 1
         scope = tuple(_clean_scope(write_scope))
+        # child runtime 共享存储，但拥有独立权限和工具 profile。
         child = build_child_runtime(self.runtime, subagent_type, scope)
         item = {
             "id": worker_id,
@@ -162,6 +163,7 @@ class WorkerManager:
                 break
             item = self._get_item(task_id)
             with self._lock:
+                # 每个 worker 结果只推送一次，完整状态仍保存在 session。
                 if item.get("notification_drained"):
                     continue
                 item["notification_drained"] = True

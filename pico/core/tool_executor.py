@@ -12,6 +12,7 @@ INLINE_TOOL_OUTPUT_LIMIT = 1000
 def run_tool(agent, name, args):
     tool = agent.tools.get(name)
     if tool is None:
+        # unknown tool 通常意味着模型输出协议漂移，统一记成 rejected。
         agent._last_tool_result_metadata = {
             "tool_status": "rejected",
             "tool_error_code": "unknown_tool",
@@ -43,6 +44,7 @@ def run_tool(agent, name, args):
         }
         return message
     if agent.repeated_tool_call(name, args):
+        # 相同工具和相同参数连续重试通常只会原地打转。
         agent._last_tool_result_metadata = repeated_tool_call_metadata(tool)
         return f"error: repeated identical tool call for {name}; choose a different tool or return a final answer"
     decision = agent.permission_checker.check(tool, args)
@@ -62,6 +64,7 @@ def run_tool(agent, name, args):
     policy = ToolPolicyChecker(agent).check(tool, args)
     _emit_tool_policy_decision(agent, tool, args, policy)
     if not policy.allowed:
+        # policy 拦截“允许执行但流程上不该这么做”的情况。
         agent._last_tool_result_metadata = {
             "tool_status": "rejected",
             "tool_error_code": policy.reason,
@@ -74,6 +77,7 @@ def run_tool(agent, name, args):
         }
         agent.record_process_note_for_tool(name, agent._last_tool_result_metadata)
         return policy.message
+    # risky 工具前后各取一次快照，用真实 diff 判断是否改变工作区。
     before_snapshot = agent.capture_workspace_snapshot() if tool.risky else {}
     after_snapshot = before_snapshot
     try:
@@ -85,6 +89,7 @@ def run_tool(agent, name, args):
         tool_status = "ok"
         tool_error_code = ""
         if name == "run_shell":
+            # 非 0 shell 可能已改文件，这类结果保留为 partial_success。
             match = re.search(r"exit_code:\s*(-?\d+)", result)
             exit_code = int(match.group(1)) if match else 0
             if exit_code != 0 and workspace_changed:
@@ -134,6 +139,7 @@ def _render_tool_result(agent, name, full_result):
         return clip(full_result), ""
     if not getattr(agent, "current_task_state", None):
         return clip(full_result, INLINE_TOOL_OUTPUT_LIMIT), ""
+    # 长 shell 输出写入 artifact，prompt 只保留摘要和相对路径。
     path = agent.run_store.write_text_artifact(agent.current_task_state, f"{name}-output", full_result)
     relative = path.relative_to(agent.root).as_posix()
     return f"full output saved: {relative}\n" + clip(full_result, INLINE_TOOL_OUTPUT_LIMIT), relative

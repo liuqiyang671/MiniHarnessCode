@@ -44,8 +44,8 @@ def test_read_then_edit_completes_in_one_turn(tmp_path):
         tmp_path,
         [
             '<tool>{"name":"read_file","args":{"path":"README.md","start":1,"end":20}}</tool>',
-            '<tool>{"name":"patch_file","args":{"path":"README.md","old_text":"Quick Start coming soon.","new_text":"Quick Start: pico --help"}}</tool>',
-            "<final>已把 Quick Start 段从占位文本改成实际的 pico --help 提示。</final>",
+            '<tool>{"name":"patch_file","args":{"path":"README.md","old_text":"Quick Start coming soon.","new_text":"Quick Start: MiniHarnessCode --help"}}</tool>',
+            "<final>已把 Quick Start 段从占位文本改成实际的 MiniHarnessCode --help 提示。</final>",
         ],
     )
 
@@ -53,7 +53,7 @@ def test_read_then_edit_completes_in_one_turn(tmp_path):
 
     assert "Quick Start" in final
     updated = (tmp_path / "README.md").read_text(encoding="utf-8")
-    assert "pico --help" in updated
+    assert "MiniHarnessCode --help" in updated
     assert "Quick Start coming soon" not in updated
 
 

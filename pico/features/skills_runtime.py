@@ -14,15 +14,19 @@ def invoke_skill(agent, name, arguments=""):
     prompt = _skill_prompt(skill, arguments)
     agent.session_event_bus.emit("skill_invoked", _event_payload(skill, arguments, prompt))
     if skill.disable_model_invocation:
+        # 有些 skill 只是模板展开，不需要再调用模型。
         agent.session_event_bus.emit("skill_completed", _event_payload(skill, arguments, prompt, status="prompt_only"))
         return skill.render(arguments)
     with _model_override(agent, skill.model), _skill_tool_profile(agent, skill):
+        # context=fork 表示 skill 在隔离会话里跑，主会话只接收最终答案。
         answer = _run_fork(agent, skill, prompt) if skill.context == "fork" else agent.ask(prompt)
     agent.session_event_bus.emit("skill_completed", _event_payload(skill, arguments, prompt, status="completed", answer=answer))
     return answer
 
 
 def _run_fork(agent, skill, prompt):
+    # fork skill 复用模型和配置，但创建新 session，
+    # 适合探索类流程，避免把中间工具历史塞进主会话。
     child = type(agent)(
         model_client=agent.model_client,
         workspace=agent.workspace,
@@ -74,6 +78,7 @@ def _skill_tool_profile(agent, skill):
         return
     previous = agent.active_tool_profile.name
     profile_name = f"skill:{skill.name}"
+    # skill 可以临时缩窄工具集；结束后必须恢复原 profile。
     allowed = frozenset(name for name in skill.allowed_tools if name in agent.tools)
     agent.tool_profiles[profile_name] = ToolSetProfile(profile_name, allowed)
     agent.set_tool_profile(profile_name)

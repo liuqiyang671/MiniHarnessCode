@@ -7,10 +7,10 @@ BRANCH="${PICO_BRANCH:-main}"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; CYAN='\033[0;36m'
 BOLD='\033[1m'; RESET='\033[0m'
-info()    { printf "${CYAN}[pico]${RESET} %s\n" "$*"; }
-success() { printf "${GREEN}[pico]${RESET} ${BOLD}%s${RESET}\n" "$*"; }
-warn()    { printf "${YELLOW}[pico]${RESET} %s\n" "$*" >&2; }
-die()     { printf "${RED}[pico] ERROR:${RESET} %s\n" "$*" >&2; exit 1; }
+info()    { printf "${CYAN}[MiniHarnessCode]${RESET} %s\n" "$*"; }
+success() { printf "${GREEN}[MiniHarnessCode]${RESET} ${BOLD}%s${RESET}\n" "$*"; }
+warn()    { printf "${YELLOW}[MiniHarnessCode]${RESET} %s\n" "$*" >&2; }
+die()     { printf "${RED}[MiniHarnessCode] ERROR:${RESET} %s\n" "$*" >&2; exit 1; }
 
 find_python() {
     for cmd in python3.13 python3.12 python3.11 python3.10 python3 python; do
@@ -26,7 +26,7 @@ find_python() {
 
 main() {
     printf "\n${BOLD}╔══════════════════════════════════════════╗${RESET}\n"
-    printf   "${BOLD}║        pico  一键安装                    ║${RESET}\n"
+        printf   "${BOLD}║        MiniHarnessCode 一键安装          ║${RESET}\n"
     printf   "${BOLD}╚══════════════════════════════════════════╝${RESET}\n\n"
 
     command -v git &>/dev/null || die "找不到 git，请先安装。"
@@ -43,7 +43,7 @@ main() {
         git -C "$INSTALL_DIR" fetch --quiet origin
         git -C "$INSTALL_DIR" reset --hard "origin/${BRANCH}" --quiet
     else
-        info "克隆 pico 到 ${INSTALL_DIR} ..."
+        info "克隆 MiniHarnessCode 到 ${INSTALL_DIR} ..."
         rm -rf "$INSTALL_DIR"
         git clone --depth 1 --branch "$BRANCH" "$REPO" "$INSTALL_DIR" --quiet
     fi
@@ -60,16 +60,16 @@ main() {
 
     BIN_DIR="${PICO_BIN_DIR:-$HOME/.local/bin}"
     mkdir -p "$BIN_DIR"
-    LAUNCHER="$BIN_DIR/pico"
+    LAUNCHER="$BIN_DIR/MiniHarnessCode"
 
     cat > "$LAUNCHER" <<EOF
 #!/usr/bin/env bash
-exec "${VENV_DIR}/bin/pico" "\$@"
+exec "${VENV_DIR}/bin/MiniHarnessCode" "\$@"
 EOF
     chmod +x "$LAUNCHER"
 
     printf "\n"
-    success "pico 安装完成！"
+    success "MiniHarnessCode 安装完成！"
     printf "\n"
 
     if ! echo "$PATH" | tr ':' '\n' | grep -qx "$BIN_DIR"; then
@@ -78,7 +78,7 @@ EOF
         printf "    ${BOLD}echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.bashrc && source ~/.bashrc${RESET}\n"
         printf "    ${BOLD}echo 'export PATH=\"\$HOME/.local/bin:\$PATH\"' >> ~/.zshrc  && source ~/.zshrc${RESET}\n\n"
     else
-        printf "  运行：${BOLD}pico${RESET}\n\n"
+        printf "  运行：${BOLD}MiniHarnessCode${RESET}\n\n"
     fi
 
     printf "  使用前请设置 API key（三种 provider 任选一个）：\n"

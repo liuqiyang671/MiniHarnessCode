@@ -45,14 +45,17 @@ DEFAULT_SECRET_ENV_NAMES = (
 )
 
 WELCOME_ART = (
-    "        /\\___/\\\\",
-    "       (  o o  )",
-    "       /   ^   \\\\",
-    "      /|       |\\\\",
+    r"      __  __ _       _ __  __                           ",
+    r"     |  \/  (_)_ __ (_)  \/  | __ _ _ __ _ __   ___ ___ ",
+    r"     | |\/| | | '_ \| | |\/| |/ _` | '__| '_ \ / _ / __|",
+    r"     | |  | | | | | | | |  | | (_| | |  | | | |  __\__ \\",
+    r"     |_|  |_|_|_| |_|_|_|  |_|\__,_|_|  |_| |_|\___|___/",
+    r"           [ code · tools · memory · evidence ]          ",
 )
-WELCOME_NAME = "pico"
+WELCOME_NAME = "MiniHarnessCode"
 WELCOME_SUBTITLE = "local coding agent"
 WELCOME_STATUS = "calm shell, ready for work"
+REPL_PROMPT = f"{WELCOME_NAME}> "
 HELP_DETAILS = (
     command_help_text()
     + "\n\n"
@@ -647,7 +650,7 @@ def main(argv=None):
         # 因此 session history 和 working memory 会跨轮延续。
         _drain_idle_worker_notifications(agent)
         try:
-            user_input = input("\npico> ").strip()
+            user_input = input(f"\n{REPL_PROMPT}").strip()
         except (EOFError, KeyboardInterrupt):
             print("")
             return 0

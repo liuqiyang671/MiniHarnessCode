@@ -208,6 +208,8 @@ def resolve_provider_config(
     base_url: str | None = None,
     api_key: str | None = None,
 ) -> ProviderConfig:
+    # 配置优先级从“显式传参”到“环境变量/配置文件/默认值”逐层回退。
+    # 这里保持集中解析，避免 CLI、TUI 和测试各自实现一套 provider 规则。
     file_values = _load_config_values(start=start, explicit_path=config_path)
     legacy_env = _load_legacy_env_values(start)
 
@@ -222,6 +224,8 @@ def resolve_provider_config(
     profile_values = _profile_values(file_values["providers"], provider_name)
     default_values = dict(PROVIDER_DEFAULTS.get(provider_name, {}))
 
+    # provider profile 和 API protocol 分开：
+    # deepseek 这样的 profile 可以复用 Anthropic-compatible 协议。
     protocol = _first_value(
         None,
         os.environ.get("PICO_PROTOCOL"),
@@ -234,6 +238,8 @@ def resolve_provider_config(
     env_values = _env_values(provider_name, protocol)
     legacy_values = _legacy_values(provider_name, protocol, legacy_env)
 
+    # 显式 CLI 参数最高优先级；旧版 .env 名称仍保留，
+    # 方便老项目升级时不必一次性改完配置。
     resolved_model = _first_value(
         model,
         os.environ.get(ENV_MODEL),
@@ -295,11 +301,14 @@ def normalize_provider_name(provider: str | None) -> str:
 def _load_config_values(start: str | Path, explicit_path: str | None) -> dict[str, Any]:
     values: dict[str, Any] = {"top": {}, "providers": {}, "sandbox": {}}
     if explicit_path:
+        # 显式 --config 表示用户只想使用这份配置，
+        # 不再叠加默认全局配置和项目配置。
         _merge_config_values(
             values, _read_config_file(Path(explicit_path).expanduser())
         )
         return values
 
+    # 默认配置先读全局，再读项目；项目配置可以覆盖个人默认值。
     for path in (DEFAULT_CONFIG_PATH, find_project_config(start)):
         if path and path.exists():
             _merge_config_values(values, _read_config_file(path))
@@ -319,6 +328,8 @@ def _read_config_file(path: Path) -> dict[str, Any]:
     if "provider" in data:
         values["top"]["provider"] = data["provider"]
 
+    # 新格式使用 [providers.<name>]；
+    # 下面还兼容旧格式 [openai]/[anthropic]/[deepseek]。
     providers = data.get("providers", {})
     if isinstance(providers, dict):
         for name, section in providers.items():

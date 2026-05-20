@@ -6,6 +6,8 @@ from .workspace import WorkspaceContext
 def build_child_runtime(parent, subagent_type, write_scope):
     from .runtime import Pico
 
+    # Explore 是只读子 agent；worker 可以写，但必须受 write_scope 约束。
+    # 这里把权限在 runtime 构造时固定下来，避免工具层临时猜测角色。
     child = Pico(
         model_client=new_model_client(parent),
         workspace=WorkspaceContext.build(parent.root, repo_root_override=parent.root),

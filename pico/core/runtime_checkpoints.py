@@ -17,6 +17,7 @@ class RuntimeCheckpointsMixin:
                 relative_parts = path.relative_to(self.root).parts
             except ValueError:
                 continue
+            # 快照只关心源码工作区，忽略缓存、虚拟环境和 Pico 自己的运行产物。
             if any(part in IGNORED_PATH_NAMES for part in relative_parts) or not path.is_file():
                 continue
             try:
@@ -47,6 +48,8 @@ class RuntimeCheckpointsMixin:
         checkpoint_id = "ckpt_" + uuid.uuid4().hex[:8]
         key_files = []
         freshness = {}
+        # key_files 取自 working memory 的 recent_files；
+        # 这是一份小而高信号的恢复锚点，而不是全仓库快照。
         for path in self.memory.to_dict()["working"]["recent_files"]:
             file_freshness = memorylib.file_freshness(path, self.root)
             freshness[path] = file_freshness

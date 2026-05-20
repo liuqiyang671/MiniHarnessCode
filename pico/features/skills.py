@@ -65,6 +65,8 @@ def discover_skills(root, home=None):
     from .skills_bundled import bundled_skills
 
     skills = {skill.name: skill for skill in bundled_skills()}
+    # 加载顺序允许用户/项目技能覆盖 builtin 同名技能；
+    # 最终按名字排序，保证 prompt 和 /skills 输出稳定。
     search_roots = [
         (Path(home or Path.home()) / ".pico" / "skills", "user"),
         (Path(root) / "skills", "project"),
@@ -96,6 +98,8 @@ def load_skill_file(path, source):
     name = str(metadata.get("name") or default_name).strip().lstrip("/")
     if not name:
         return None
+    # frontmatter 是轻量协议：字段缺失时回退到安全默认值，
+    # 这样普通 Markdown 文件也可以渐进升级成 skill。
     return Skill(
         name=name,
         description=_string(metadata.get("description")),
@@ -118,6 +122,7 @@ def parse_frontmatter(text):
     if not match:
         return {}, str(text)
     metadata = {}
+    # 这里故意只支持简单 key: value，避免为 skill 文件引入完整 YAML 依赖。
     for line in match.group(1).splitlines():
         line = line.strip()
         if not line or line.startswith("#") or ":" not in line:

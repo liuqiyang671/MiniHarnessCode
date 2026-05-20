@@ -22,6 +22,8 @@ class TurnHistoryBuilder:
     def enrich(self, item):
         item = dict(item)
         if not item.get("turn_id"):
+            # 没有 active turn 时（例如手动写入系统消息），
+            # 自动分配 manual turn，避免历史压缩时失去分组。
             current_turn = str(getattr(self.agent, "current_turn_id", "") or "")
             if not current_turn:
                 if item.get("role") == "user" or not self.agent.session.get("_manual_turn_id"):
@@ -58,6 +60,8 @@ class TurnHistoryBuilder:
         turns = self._group_turns(history)
         recent_window = 3
         recent_turns = set(list(turns)[-recent_window:])
+        # 最近 turn 尽量保真；更早的 turn 会折叠重复 read_file
+        # 并复用 memory 中的文件摘要。
         entries, details = self._compressed_turn_entries(turns, recent_turns)
         rendered_entries = []
         for entry in reversed(entries):
@@ -99,6 +103,7 @@ class TurnHistoryBuilder:
             lines = [f"Turn {turn_id}:"]
             for item in items:
                 if item.get("kind") == "compact_summary":
+                    # compact summary 已经是压缩结果，直接拼入 transcript。
                     lines.extend(str(item.get("content", "")).splitlines())
                     continue
                 if not recent and item.get("role") == "tool" and item.get("name") == "read_file":

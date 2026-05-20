@@ -18,6 +18,8 @@ PHASE_BY_EVENT = {
 
 def build_runtime_event(runtime, task_state, event, payload):
     payload = dict(payload or {})
+    # 所有 trace event 都补齐同一组字段，
+    # 这样 jsonl 可以直接被测试、指标或外部工具消费。
     payload["event"] = str(event)
     payload["created_at"] = now()
     payload.setdefault("trace_id", task_state.run_id)
@@ -33,6 +35,8 @@ def build_runtime_event(runtime, task_state, event, payload):
     payload.setdefault("error_type", _error_type(payload))
     payload.setdefault("parent_span_id", runtime._last_trace_span_id.get(task_state.run_id, ""))
     runtime._trace_seq += 1
+    # span_id 是单调递增的轻量链路 ID，
+    # parent_span_id 记录上一个 span，便于粗略还原事件顺序。
     payload.setdefault("span_id", f"span_{runtime._trace_seq:06d}")
     runtime._last_trace_span_id[task_state.run_id] = payload["span_id"]
     return payload

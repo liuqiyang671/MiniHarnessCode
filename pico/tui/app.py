@@ -56,6 +56,8 @@ class PicoTuiApp(App):
         self._ask_user_decision: tuple[threading.Event, dict] | None = None
         self._previous_approve = getattr(agent, "approve", None)
         self._previous_ask_user = getattr(agent, "ask_user_callback", None)
+        # TUI 临时接管 approval/ask_user，把阻塞式决策桥接到 Textual 组件。
+        # on_unmount 会恢复原回调，避免影响同一个 agent 的后续非 TUI 使用。
         self.agent.approve = self._approval_callback
         self.agent.ask_user_callback = self._ask_user_callback
 
@@ -186,6 +188,7 @@ class PicoTuiApp(App):
     async def _agent_task(self, text: str) -> None:
         loop = asyncio.get_running_loop()
         try:
+            # Engine 是同步 generator；放进 executor，避免阻塞 Textual 事件循环。
             await loop.run_in_executor(None, partial(self._drive_turn, text))
         except Exception as exc:
             self.query_one(ChatLog).add_message("assistant", f"[Error] {exc}")
@@ -205,6 +208,7 @@ class PicoTuiApp(App):
     def _drive_turn(self, text: str) -> None:
         for event in self.agent.engine.run_turn(text):
             try:
+                # runtime event 由后台线程产生，UI 更新必须切回 Textual 主线程。
                 self.call_from_thread(self._handle_runtime_event, dict(event))
             except RuntimeError:
                 return
@@ -247,6 +251,7 @@ class PicoTuiApp(App):
     def _finish_tool_card(self, event: dict) -> None:
         name = str(event.get("name", ""))
         card = None
+        # 多个同名工具可能连续运行，所以从后往前找最近的 running card。
         for candidate in reversed(self._running_tool_cards):
             if candidate.tool_name == name and candidate.status == "running":
                 card = candidate
@@ -277,6 +282,7 @@ class PicoTuiApp(App):
             self.call_from_thread(self._show_confirm, name, args, event, decision)
         except RuntimeError:
             return False
+        # 工具线程在这里阻塞，UI 主线程负责展示确认框并唤醒它。
         event.wait()
         return bool(decision.get("approved", False))
 

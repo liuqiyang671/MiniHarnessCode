@@ -10,6 +10,8 @@ class ArtifactGraphConsumer:
             return
         if not task_state.changed_paths and not event.get("artifact_paths"):
             return
+        # artifact graph 是从 trace 派生出来的可验证对象；
+        # 不参与主流程决策，只服务报告和测试建议。
         graph = build_artifact_graph(runtime.root, task_state.changed_paths)
         task_state.artifact_graph = graph
 
@@ -29,6 +31,8 @@ class ReminderConsumer:
         status = str(event.get("status", ""))
         if status in {"", "ok"}:
             return
+        # 把非 OK 工具结果沉淀成 runtime reminder，
+        # 让下一轮 prompt 能提醒模型先处理失败上下文。
         reminder = {
             "event": "tool_executed",
             "tool": str(event.get("name", "")),

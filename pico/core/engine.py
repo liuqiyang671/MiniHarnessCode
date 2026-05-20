@@ -60,6 +60,7 @@ class Engine:
     def run_turn(self, user_message):
         agent = self.runtime
         run_started_at = time.monotonic()
+        # 每个用户请求都创建独立 task/run，串起 trace、report 和 checkpoint。
         task_state = TaskState.create(
             run_id=agent.new_run_id(),
             task_id=agent.new_task_id(),
@@ -104,7 +105,7 @@ class Engine:
         tool_steps = 0
         attempts = 0
         provider_retries = {}
-        # 不放大 attempts，避免出现"看不见的隐形重试"——失败必须被用户察觉。
+        # 不放大 attempts，避免坏格式响应被隐形重试吞掉。
         max_attempts = agent.max_steps + 2
 
         while tool_steps < agent.max_steps and attempts < max_attempts:
@@ -123,6 +124,7 @@ class Engine:
             task_state.record_attempt()
             agent.run_store.write_task_state(task_state)
             prompt_started_at = time.monotonic()
+            # prompt 每轮重组，因为工具可能改变 workspace、memory 或 checkpoint。
             prompt, prompt_metadata = agent._build_prompt_and_metadata(user_message)
             agent.emit_trace(
                 task_state,
@@ -133,6 +135,7 @@ class Engine:
                 },
             )
             if prompt_metadata.get("resume_status") == CHECKPOINT_PARTIAL_STALE_STATUS:
+                # 关键文件 freshness 变了，先落 checkpoint 标记恢复上下文已变。
                 checkpoint = agent.create_checkpoint(
                     task_state, user_message, trigger="freshness_mismatch"
                 )
@@ -149,6 +152,7 @@ class Engine:
                 prompt_metadata.get("resume_status")
                 == CHECKPOINT_WORKSPACE_MISMATCH_STATUS
             ):
+                # runtime 身份变化会影响可复现性，单独记录 mismatch 字段。
                 agent.emit_trace(
                     task_state,
                     "runtime_identity_mismatch",
@@ -171,6 +175,7 @@ class Engine:
                     },
                 )
             if prompt_metadata.get("budget_reductions"):
+                # 上下文裁剪时也建 checkpoint，保留恢复线索。
                 checkpoint = agent.create_checkpoint(
                     task_state, user_message, trigger="context_reduction"
                 )
@@ -210,6 +215,7 @@ class Engine:
             prompt_cache_key = None
             prompt_cache_retention = None
             if getattr(agent.model_client, "supports_prompt_cache", False):
+                # cache key 来自稳定 prefix，避免动态 history 破坏缓存复用。
                 prompt_cache_key = prompt_metadata.get("prompt_cache_key")
                 prompt_cache_retention = "in_memory"
 
@@ -314,6 +320,7 @@ class Engine:
                 for tool_payload in tools:
                     if tool_steps >= agent.max_steps:
                         break
+                    # helper 负责权限、trace、checkpoint 和 workspace diff。
                     yield from execute_tool_payload(
                         self, task_state, user_message, tool_payload
                     )
@@ -351,6 +358,7 @@ class Engine:
             final = (payload or raw).strip()
             yield from self._drain_worker_notification_events()
             if agent.runtime_mode == "plan" and not agent.plan_mode.can_finish():
+                # plan mode 必须先写计划 artifact，不能只口头完成。
                 notice = agent.plan_mode.final_notice()
                 agent.record(
                     {"role": "assistant", "content": notice, "created_at": now()}
@@ -385,6 +393,7 @@ class Engine:
             task_state.finish_success(final)
             agent.promote_durable_memory(user_message, final)
             maintain_memory_safely(agent, task_state, final)
+            # 成功结束时写收尾 checkpoint，供 /resume 和复盘定位最终状态。
             checkpoint = agent.create_checkpoint(
                 task_state, user_message, trigger="run_finished"
             )
@@ -432,11 +441,13 @@ class Engine:
             return
 
         if attempts >= max_attempts and tool_steps < agent.max_steps:
+            # 这里代表模型一直没有给出可执行协议，而不是工具预算耗尽。
             final = "Stopped after too many malformed model responses without a valid tool call or final answer."
             task_state.stop_retry_limit(final)
         else:
             summary = None
             if tool_steps > 0:
+                # 达到工具预算时，额外请求一次“无工具总结”。
                 summary = request_step_limit_summary(self, task_state, user_message)
             if summary:
                 final = (

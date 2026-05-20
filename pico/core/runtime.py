@@ -239,6 +239,8 @@ class Pico(RuntimeSecretsMixin, RuntimeCheckpointsMixin):
         return resolved
 
     def _ensure_session_shape(self):
+        # session 文件可能来自旧版本；这里集中补齐字段，
+        # 让后续代码可以按当前 schema 读取。
         self.session.setdefault("history", [])
         self.session.setdefault("memory", memorylib.default_memory_state())
         checkpoints = self.session.setdefault("checkpoints", {})
@@ -258,6 +260,8 @@ class Pico(RuntimeSecretsMixin, RuntimeCheckpointsMixin):
             self.session["runtime_mode"] = {"mode": "default"}
 
     def current_runtime_identity(self):
+        # 这份 identity 用于判断“恢复时的运行环境”是否仍然等价。
+        # 会影响行为的配置都纳入，纯展示字段不放进来。
         return {
             "session_id": self.session.get("id", ""),
             "cwd": str(self.root),
@@ -304,6 +308,8 @@ class Pico(RuntimeSecretsMixin, RuntimeCheckpointsMixin):
             if checkpoint.get("schema_version") != CHECKPOINT_SCHEMA_VERSION:
                 status = CHECKPOINT_SCHEMA_MISMATCH_STATUS
             else:
+                # 先检查关键文件 freshness，再检查 runtime identity。
+                # 前者说明代码事实变了，后者说明执行规则变了。
                 for item in checkpoint.get("key_files", []):
                     path = str(item.get("path", "")).strip()
                     if not path:
@@ -437,6 +443,8 @@ class Pico(RuntimeSecretsMixin, RuntimeCheckpointsMixin):
         ).hexdigest()
 
     def build_prefix(self):
+        # prefix 是 prompt 中最稳定、最适合缓存的部分。
+        # 所以它只包含身份、规则、工具签名和工作区快照，不放当前用户请求。
         tool_lines = []
         for name, tool in self.available_tools().items():
             fields = ", ".join(
@@ -591,6 +599,8 @@ class Pico(RuntimeSecretsMixin, RuntimeCheckpointsMixin):
         return prompt
 
     def record(self, item):
+        # 所有会进入会话历史的条目都先经过 TurnHistoryBuilder，
+        # 它会补齐可复用的摘要字段，供后续上下文压缩使用。
         self.session["history"].append(self.turn_history.enrich(item))
         self.session_path = self.session_store.save(self.session)
 
@@ -692,11 +702,15 @@ class Pico(RuntimeSecretsMixin, RuntimeCheckpointsMixin):
 
     def emit_trace(self, task_state, event, payload=None):
         payload = self.redact_artifact(payload or {})
+        # affected_paths 同步进 task_state，是为了让最终 report
+        # 能直接给出本轮实际触碰过哪些文件。
         for path in payload.get("affected_paths", []) or []:
             if path not in task_state.changed_paths:
                 task_state.changed_paths.append(path)
         payload = build_runtime_event(self, task_state, event, payload)
         self.run_store.append_trace(task_state, payload)
+        # runtime consumers 是 trace 的旁路订阅者；
+        # 失败不能打断主流程，所以这里吞掉 consumer 异常。
         for consumer in self.runtime_consumers:
             try:
                 consumer.handle(self, task_state, payload)
@@ -839,7 +853,8 @@ class Pico(RuntimeSecretsMixin, RuntimeCheckpointsMixin):
         )
 
     def build_report(self, task_state):
-        # report 是一次运行的最终摘要；
+        # report 是一次运行的最终摘要；它面向复盘和测试，
+        # 因此会包含 prompt 元数据、记忆维护、worker 状态和 artifact 图。
         return {
             "run_id": task_state.run_id,
             "task_id": task_state.task_id,
@@ -899,6 +914,7 @@ class Pico(RuntimeSecretsMixin, RuntimeCheckpointsMixin):
     extract_raw = staticmethod(model_output.extract_raw)
 
     def reset(self):
+        # reset 只清空当前会话的交互状态，不删除磁盘上的 durable memory。
         self.session["history"] = []
         self.session["memory"].clear()
         self.session["memory"].update(memorylib.default_memory_state())

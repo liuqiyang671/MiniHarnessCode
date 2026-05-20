@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-pico = "pico.cli:main"
+MiniHarnessCode = "pico.cli:main"
 pico-tui = "pico.tui.main:main"
 
 [dependency-groups]

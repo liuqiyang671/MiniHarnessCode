@@ -103,6 +103,20 @@ def test_status_bar_reads_context_usage_governance_fields():
     assert "context 1234/200000" in rendered_text(status)
 
 
+def test_tui_welcome_and_input_use_display_name():
+    from pico.tui.widgets import InputBar, WelcomeBanner
+
+    banner = WelcomeBanner(model_name="test-model", cwd="workspace", approval="auto")
+    input_bar = InputBar()
+
+    assert "MiniHarnessCode" in rendered_text(banner)
+    assert "Ask MiniHarnessCode or type /help" == input_bar.input.placeholder
+
+    input_bar.set_busy(True)
+
+    assert "MiniHarnessCode is working..." == input_bar.input.placeholder
+
+
 def test_cli_plan_mode_and_session_commands_expose_runtime_state(tmp_path):
     from pico.cli import handle_repl_command
 

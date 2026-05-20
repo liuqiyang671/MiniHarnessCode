@@ -22,10 +22,14 @@ class SandboxRunner:
             config.mode != "required"
             and command_is_excluded(command, config.excluded_commands)
         ):
+            # off 或显式排除的命令走普通 shell；
+            # 这条路径仍然使用过滤后的 env，由上层 runtime 负责提供。
             return self._plain(command, cwd=cwd, env=env, timeout=timeout)
 
         backend_path = SandboxChecker(self.which).backend_path(config.backend)
         if not backend_path:
+            # best_effort 在后端不可用时降级执行；required 则硬失败。
+            # 事件会进 session log，方便排查为什么没进沙箱。
             self.emit_event(
                 "sandbox_unavailable",
                 {
@@ -57,6 +61,8 @@ class SandboxRunner:
         )
 
     def _bubblewrap_argv(self, backend_path, command, cwd, config):
+        # bubblewrap 参数以最小可用环境为目标：
+        # 系统目录只读挂载，工作区按配置决定读写，deny 列表用 tmpfs 遮蔽。
         argv = [
             backend_path,
             "--die-with-parent",

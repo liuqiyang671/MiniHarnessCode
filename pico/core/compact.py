@@ -20,6 +20,8 @@ class CompactManager:
         kept_turns = groups[-keep_recent_turns:]
         compacted_items = [item for _, items in compacted_turns for item in items]
         kept_items = [item for _, items in kept_turns for item in items]
+        # 只压缩旧 turn，保留最近 turn 的原文，
+        # 避免当前工作上下文被摘要损失掉关键细节。
         summary_text = self._summary_text(compacted_items)
         summary_item = self.agent.turn_history.enrich(
             {
@@ -45,6 +47,8 @@ class CompactManager:
         groups = []
         by_id = {}
         for item in history:
+            # 老 session 可能没有 turn_id，统一归到 legacy，
+            # 保证压缩逻辑能兼容旧历史。
             turn_id = str(item.get("turn_id") or "legacy")
             if turn_id not in by_id:
                 by_id[turn_id] = []
@@ -70,6 +74,8 @@ class CompactManager:
         files_modified = []
         user_requests = []
         assistant_notes = []
+        # 摘要只保留恢复工作需要的骨架信息；
+        # 具体证据仍在 run artifacts 和最近未压缩 turn 中。
         for item in items:
             if item.get("role") == "user":
                 user_requests.append(str(item.get("content", "")).strip())

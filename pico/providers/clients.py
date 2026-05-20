@@ -26,6 +26,8 @@ def _normalize_versioned_base_url(base_url):
 
 
 def _extract_openai_text(data):
+    # 兼容 Responses API、Chat Completions 兼容层和部分代理后端。
+    # 找到第一段可用文本即可返回，上层不关心具体响应形状。
     if data.get("output_text"):
         return data["output_text"]
 
@@ -105,6 +107,8 @@ def _extract_openai_text_from_sse(body_text):
 def _extract_openai_response_from_sse(body_text):
     last_response = None
     deltas = []
+    # SSE 可能逐 token 给 delta，也可能最后给完整 response。
+    # 这里同时保留 last_response，方便后面提取 usage/cache 元数据。
     for line in body_text.splitlines():
         line = line.strip()
         if not line.startswith("data:"):
@@ -174,6 +178,8 @@ def _request_with_retries(provider, model, base_url, request, timeout, retry_bud
             body = exc.read().decode("utf-8", errors="replace")
             retryable = exc.code in RETRYABLE_HTTP_STATUS or exc.code >= 500
             if retryable and attempt < attempts - 1:
+                # provider 层只重试明确可恢复的传输/限流问题；
+                # 业务错误会立即抛出，避免隐藏真实配置问题。
                 retry_count += 1
                 time.sleep(_retry_delay(attempt, exc.headers))
                 continue
@@ -193,6 +199,7 @@ def _request_with_retries(provider, model, base_url, request, timeout, retry_bud
         except (urllib.error.URLError, RemoteDisconnected, TimeoutError, socket.timeout) as exc:
             retryable = True
             if attempt < attempts - 1:
+                # 网络类错误通常短暂，给一次很小的退避窗口。
                 retry_count += 1
                 time.sleep(_retry_delay(attempt, None))
                 continue

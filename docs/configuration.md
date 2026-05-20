@@ -1,10 +1,12 @@
 # 配置
 
-pico 的配置按下面这个优先级合并：
+MiniHarnessCode 的配置按下面这个优先级合并：
 
 ```
 CLI 显式参数 > 环境变量 > 项目 .pico.toml > 全局 ~/.config/pico/config.toml > 代码默认
 ```
+
+MiniHarnessCode 只改了用户可见启动命令；配置文件、环境变量和本地数据目录仍沿用 `pico` / `.pico` / `PICO_*`，确保已有项目可以无缝继续使用。
 
 ## Provider profile
 
@@ -39,9 +41,9 @@ model = "claude-sonnet-4-6"
 切 provider：
 
 ```bash
-pico                       # 用 toml 里的默认 provider
-pico --provider openai     # 临时切换
-pico --provider anthropic --model claude-opus-4-6
+MiniHarnessCode                       # 用 toml 里的默认 provider
+MiniHarnessCode --provider openai     # 临时切换
+MiniHarnessCode --provider anthropic --model claude-opus-4-6
 ```
 
 ## 环境变量
@@ -65,19 +67,19 @@ pico --provider anthropic --model claude-opus-4-6
 ## CLI 参数
 
 ```bash
-pico --provider deepseek --model deepseek-v4-pro
-pico --api-key sk-... --base-url https://...
-pico --max-steps 50 --max-new-tokens 4096
-pico --temperature 0.0
-pico --approval ask          # ask | auto | never
-pico --sandbox best_effort   # off | best_effort | required
-pico --no-auto-dream         # 关闭后台 memory 整合
-pico --cwd /path/to/repo     # 切换工作目录
-pico --resume latest         # 续接上一个 session
-pico --config /path/to/custom.toml
+MiniHarnessCode --provider deepseek --model deepseek-v4-pro
+MiniHarnessCode --api-key sk-... --base-url https://...
+MiniHarnessCode --max-steps 50 --max-new-tokens 4096
+MiniHarnessCode --temperature 0.0
+MiniHarnessCode --approval ask          # ask | auto | never
+MiniHarnessCode --sandbox best_effort   # off | best_effort | required
+MiniHarnessCode --no-auto-dream         # 关闭后台 memory 整合
+MiniHarnessCode --cwd /path/to/repo     # 切换工作目录
+MiniHarnessCode --resume latest         # 续接上一个 session
+MiniHarnessCode --config /path/to/custom.toml
 ```
 
-跑 `pico --help` 看完整参数。
+跑 `MiniHarnessCode --help` 看完整参数。
 
 ## 默认值速查
 

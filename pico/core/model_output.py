@@ -6,6 +6,8 @@ import re
 
 def parse(raw):
     raw = str(raw)
+    # 如果 tool 和 final 同时出现，优先执行先出现的 tool。
+    # 这是为了容忍模型在工具调用后附带解释，但仍保持单一协议入口。
     if "<tool" in raw and (
         "<final>" not in raw or raw.find("<tool") < raw.find("<final>")
     ):
@@ -44,6 +46,8 @@ def normalize_tool_payload(payload):
         return normalized
     if not isinstance(payload, dict) or "name" not in payload:
         return "tool JSON must be an object with name and args"
+    # args 必须始终是对象，这样后续 validator 可以按工具 schema
+    # 做确定性的字段检查。
     args = payload.get("args", {})
     if not isinstance(args, dict):
         return "tool args must be an object"
@@ -58,6 +62,7 @@ def parse_tool_blocks(raw):
     ):
         attrs = parse_attrs(match.group("attrs"))
         if attrs.get("name", "").strip():
+            # XML 形式服务于多行文本写入，避免 JSON 字符串转义把 patch 内容弄坏。
             parsed_xml = parse_xml_tool_match(match)
             if parsed_xml:
                 tools.append(parsed_xml)
@@ -118,6 +123,7 @@ def parse_xml_tool_match(match):
         if value is not None:
             args[tag] = value
     if name == "write_file" and "content" not in args and body.strip():
+        # write_file 允许把整个 body 当 content，方便生成完整文件。
         args["content"] = body
     return {"name": name, "args": args}
 

@@ -12,11 +12,15 @@ from ..commands.slash import SlashCommand, suggest_commands
 
 
 PICO_MARK = [
-    r"        /\___/\\",
-    r"       (  o o  )",
-    r"       /   ^   \\",
-    r"      /|       |\\",
+    r"        __  __ _       _ _   _                          ",
+    r"       |  \/  (_)_ __ (_) | | | __ _ _ __ _ __   ___ ___ ",
+    r"       | |\/| | | '_ \| | |_| |/ _` | '__| '_ \ / _ / __|",
+    r"       | |  | | | | | | |  _  | (_| | |  | | | |  __\__ \\",
+    r"       |_|  |_|_|_| |_|_|_| |_|\__,_|_|  |_| |_|\___|___/",
+    r"             < harness your code, trace every run >       ",
 ]
+
+DISPLAY_NAME = "MiniHarnessCode"
 
 
 def format_tool_args(name: str, args: dict | None) -> str:
@@ -63,7 +67,7 @@ class WelcomeBanner(Static):
         accent = "#9ec5fe"
         rows = [
             Text.assemble(
-                Text("pico", style=f"bold {accent}"),
+                Text(DISPLAY_NAME, style=f"bold {accent}"),
                 Text("  local coding agent", style=muted),
             ),
             Text(""),
@@ -498,7 +502,7 @@ class InputBar(Static):
 
     def __init__(self) -> None:
         super().__init__()
-        self.input = Input(placeholder="Ask pico or type /help")
+        self.input = Input(placeholder=f"Ask {DISPLAY_NAME} or type /help")
         self.history: list[str] = []
         self.history_index = 0
         self._slash_suggestions: list[SlashCommand] = []
@@ -514,7 +518,9 @@ class InputBar(Static):
     def set_busy(self, busy: bool) -> None:
         self.input.disabled = bool(busy)
         self.input.placeholder = (
-            "pico is working..." if busy else "Ask pico or type /help"
+            f"{DISPLAY_NAME} is working..."
+            if busy
+            else f"Ask {DISPLAY_NAME} or type /help"
         )
 
     def history_prev(self) -> None:

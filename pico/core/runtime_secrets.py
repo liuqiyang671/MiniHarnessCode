@@ -36,11 +36,13 @@ class RuntimeSecretsMixin:
 
     def redact_text(self, text):
         text = str(text)
+        # 先替换更长的 secret，避免短 token 提前替换导致长 secret 残留片段。
         for _, value in sorted(self.detected_secret_env_items(), key=lambda item: len(item[1]), reverse=True):
             text = text.replace(value, REDACTED_VALUE)
         return text
 
     def redact_artifact(self, value, key=None):
+        # artifact 可能是嵌套 dict/list；递归处理能覆盖 trace/report 中的任意层级。
         if key and self.is_secret_env_name(key):
             return REDACTED_VALUE
         if isinstance(value, dict):
@@ -54,6 +56,8 @@ class RuntimeSecretsMixin:
         return value
 
     def shell_env(self):
+        # shell 只拿 allowlist 中的环境变量，再显式修正 PWD。
+        # provider key 等敏感变量默认不会进入子进程环境。
         env = {name: os.environ[name] for name in self.shell_env_allowlist if name in os.environ}
         env["PWD"] = str(self.root)
         if "PATH" not in env and os.environ.get("PATH"):

@@ -25,6 +25,8 @@ class SessionStore:
         path = self.path(session["id"])
         payload = json.dumps(session, indent=2)
         with self._lock:
+            # session 状态采用临时文件 + replace，
+            # 防止并发 worker 或异常退出留下半截 JSON。
             tmp_path = path.with_name(
                 f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp"
             )
@@ -53,6 +55,7 @@ class SessionStore:
             try:
                 session = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError):
+                # 损坏或半写入的 session 不影响列表展示。
                 continue
             history = list(session.get("history", []))
             rows.append(

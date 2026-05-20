@@ -3,6 +3,10 @@ import io
 import json
 import subprocess
 import sys
+try:
+    import tomllib
+except ModuleNotFoundError:
+    import tomli as tomllib
 import urllib.error
 from pathlib import Path
 from unittest.mock import patch
@@ -22,6 +26,21 @@ from pico import (
 from pico.providers import ProviderError
 
 
+def test_project_exposes_mini_harness_code_command():
+    project_root = Path(__file__).resolve().parents[1]
+    pyproject = tomllib.loads((project_root / "pyproject.toml").read_text(encoding="utf-8"))
+    scripts = pyproject["project"]["scripts"]
+
+    assert scripts["MiniHarnessCode"] == "pico.cli:main"
+    assert "pico" not in scripts
+
+
+def test_repl_prompt_uses_mini_harness_code_name():
+    from pico.cli import REPL_PROMPT
+
+    assert REPL_PROMPT == "MiniHarnessCode> "
+
+
 def build_workspace(tmp_path):
     (tmp_path / "README.md").write_text("demo\n", encoding="utf-8")
     return WorkspaceContext.build(tmp_path)
@@ -38,6 +57,37 @@ def build_agent(tmp_path, outputs, **kwargs):
         approval_policy=approval_policy,
         **kwargs,
     )
+
+
+def test_workspace_context_git_commands_decode_utf8_output(monkeypatch, tmp_path):
+    (tmp_path / "README.md").write_text("demo\n", encoding="utf-8")
+
+    class Result:
+        def __init__(self, stdout):
+            self.stdout = stdout
+
+    def fake_run(args, **kwargs):
+        if kwargs.get("encoding") != "utf-8" or kwargs.get("errors") != "replace":
+            raise UnicodeDecodeError("gbk", b"\xa2", 0, 1, "illegal multibyte sequence")
+        command = list(args[1:])
+        if command == ["rev-parse", "--show-toplevel"]:
+            return Result(str(tmp_path))
+        if command == ["branch", "--show-current"]:
+            return Result("feature/windows-utf8\n")
+        if command == ["symbolic-ref", "--short", "refs/remotes/origin/HEAD"]:
+            return Result("origin/main\n")
+        if command == ["status", "--short"]:
+            return Result(" M 含中文路径.txt\n")
+        if command == ["log", "--oneline", "-5"]:
+            return Result("abc123 修复中文路径\n")
+        return Result("")
+
+    monkeypatch.setattr("pico.core.workspace.subprocess.run", fake_run)
+
+    workspace = WorkspaceContext.build(tmp_path)
+
+    assert "含中文路径.txt" in workspace.status
+    assert workspace.recent_commits == ["abc123 修复中文路径"]
 
 
 def test_agent_runs_tool_then_final(tmp_path):
@@ -275,8 +325,7 @@ def test_welcome_screen_keeps_box_shape_for_long_paths(tmp_path):
     assert len(lines) >= 5
     assert len({len(line) for line in lines}) == 1
     assert "..." in welcome
-    assert "(  o o  )" in welcome
-    assert "pico" in welcome
+    assert "MiniHarnessCode" in welcome
     assert "local coding agent" in welcome
     assert "// READY" not in welcome
     assert "SLASH" not in welcome

@@ -229,6 +229,7 @@ class ContextManager:
         for section in SECTION_ORDER:
             budget = budgets.get(section)
             if section == CURRENT_REQUEST_SECTION:
+                # 当前请求不参与裁剪；一旦裁掉，模型可能连本轮目标都误解。
                 raw = section_texts[section]
                 rendered[section] = SectionRender(raw=raw, budget=0, rendered=raw, details={})
             elif section == "relevant_memory":
@@ -330,6 +331,8 @@ class ContextManager:
     def _metadata(self, prompt, rendered, budgets, reduction_log, selected_notes, user_message, section_texts):
         section_metadata = {}
         for section in SECTION_ORDER[:-1]:
+            # metadata 不只服务日志，也服务测试：
+            # 它能精确说明每个 section 被裁到了什么程度。
             section_metadata[section] = {
                 "raw_chars": rendered[section].raw_chars,
                 "budget_chars": int(budgets.get(section, 0)),

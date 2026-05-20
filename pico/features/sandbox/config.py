@@ -26,6 +26,7 @@ def resolve_sandbox_config(values):
     filesystem = dict(sandbox.get("filesystem", {}) or {})
     mode = str(sandbox.get("mode", "off") or "off")
     backend = str(sandbox.get("backend", "auto") or "auto")
+    # 先验证枚举值，再构造 dataclass，让错误尽早暴露给 CLI。
     if mode not in SANDBOX_MODES:
         raise ValueError(f"sandbox.mode must be one of {sorted(SANDBOX_MODES)}")
     if backend not in SANDBOX_BACKENDS:
